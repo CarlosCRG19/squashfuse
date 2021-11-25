@@ -267,7 +267,7 @@ static int sqfs_hl_op_statfs(const char *path, struct statvfs *st) {
 }
 
 
-static sqfs_hl *sqfs_hl_open(const char *path, size_t offset) {
+static sqfs_hl *sqfs_hl_open(const char *path, size_t offset, void **zstd_dict_buf, size_t zstd_dict_size) {
 	sqfs_hl *hl;
 	
 	hl = malloc(sizeof(*hl));
@@ -275,7 +275,7 @@ static sqfs_hl *sqfs_hl_open(const char *path, size_t offset) {
 		perror("Can't allocate memory");
 	} else {
 		memset(hl, 0, sizeof(*hl));
-		if (sqfs_open_image(&hl->fs, path, offset) == SQFS_OK) {
+		if (sqfs_open_image(&hl->fs, path, offset, *zstd_dict_buf, zstd_dict_size) == SQFS_OK) {         // PLAYGROUND
 			if (sqfs_inode_get(&hl->fs, &hl->root, sqfs_inode_root(&hl->fs)))
 				fprintf(stderr, "Can't find the root of this filesystem!\n");
 			else
@@ -296,6 +296,7 @@ int main(int argc, char *argv[]) {
 	
 	struct fuse_opt fuse_opts[] = {
 		{"offset=%zu", offsetof(sqfs_opts, offset), 0},
+		{"ZSTD_dict=%s", offsetof(sqfs_opts, zstd_dict), 0}, // read dicitonary name
 		FUSE_OPT_END
 	};
 
@@ -324,12 +325,22 @@ int main(int argc, char *argv[]) {
 	opts.image = NULL;
 	opts.mountpoint = 0;
 	opts.offset = 0;
-	if (fuse_opt_parse(&args, &opts, fuse_opts, sqfs_opt_proc) == -1)
+	opts.zstd_dict = NULL;
+	if (fuse_opt_parse(&args, &opts, fuse_opts, sqfs_opt_proc) == -1) 	
 		sqfs_usage(argv[0], true);
 	if (!opts.image)
 		sqfs_usage(argv[0], true);
 	
-	hl = sqfs_hl_open(opts.image, opts.offset);
+	void *zstd_dict_buf;
+	size_t zstd_dict_size = 0;
+	if (opts.zstd_dict != NULL)
+		load_dict(opts.zstd_dict, &zstd_dict_buf, &zstd_dict_size);
+
+	if (zstd_dict_size > 0) 
+		hl = sqfs_hl_open(opts.image, opts.offset, &zstd_dict_buf, zstd_dict_size);
+	else 
+		hl = sqfs_hl_open(opts.image, opts.offset, NULL, 0);
+
 	if (!hl)
 		return -1;
 	

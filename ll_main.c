@@ -55,6 +55,7 @@ int main(int argc, char *argv[]) {
 	struct fuse_opt fuse_opts[] = {
 		{"offset=%zu", offsetof(sqfs_opts, offset), 0},
 		{"timeout=%u", offsetof(sqfs_opts, idle_timeout_secs), 0},
+		{"ZSTD_dict=%s", offsetof(sqfs_opts, zstd_dict), 0}, // read dictionary 
 		FUSE_OPT_END
 	};
 	
@@ -85,6 +86,7 @@ int main(int argc, char *argv[]) {
 	opts.mountpoint = 0;
 	opts.offset = 0;
 	opts.idle_timeout_secs = 0;
+	opts.zstd_dict = NULL;
 	if (fuse_opt_parse(&args, &opts, fuse_opts, sqfs_opt_proc) == -1)
 		sqfs_usage(argv[0], true);
 
@@ -123,8 +125,16 @@ int main(int argc, char *argv[]) {
 	    }
 	}
 
+	void *zstd_dict_buf;
+	size_t zstd_dict_size = 0;
+	if (opts.zstd_dict != NULL)
+		load_dict(opts.zstd_dict, &zstd_dict_buf, &zstd_dict_size);
+
 	/* OPEN FS */
-	err = !(ll = sqfs_ll_open(opts.image, opts.offset));
+	if (zstd_dict_size > 0) 
+		err = !(ll = sqfs_ll_open(opts.image, opts.offset, zstd_dict_buf, zstd_dict_size));
+	else 
+		err = !(ll = sqfs_ll_open(opts.image, opts.offset, NULL, 0));
 	
 	/* STARTUP FUSE */
 	if (!err) {

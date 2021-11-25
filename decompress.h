@@ -39,7 +39,7 @@ void sqfs_compression_supported(sqfs_compression_type *types);
 
 
 typedef sqfs_err (*sqfs_decompressor)(void *in, size_t insz,
-	void *out, size_t *outsz);
+	void *out, size_t *outsz, void **zstd_dict_buf, size_t zstd_dict_size);
 
 sqfs_decompressor sqfs_decompressor_get(sqfs_compression_type type);
 

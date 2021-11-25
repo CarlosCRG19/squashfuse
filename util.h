@@ -28,6 +28,8 @@
 #include "common.h"
 
 #include <stdio.h>
+#include <sys/stat.h>
+
 
 /* Open a file, and optionally print a message on failure */
 sqfs_err sqfs_fd_open(const char *path, sqfs_fd_t *fd, bool print);
@@ -36,6 +38,13 @@ sqfs_err sqfs_fd_open(const char *path, sqfs_fd_t *fd, bool print);
 void sqfs_fd_close(sqfs_fd_t fd);
 
 /* Open a filesystem and print errors to stderr. */
-sqfs_err sqfs_open_image(sqfs *fs, const char *image, size_t offset);
+sqfs_err sqfs_open_image(sqfs *fs, const char *image, size_t offset, void *zstd_dict_buf, size_t zstd_dict_size);
+
+/*	Load dictionary to passed buffer */ 
+sqfs_err load_dict(const char *dict_filename, void **dict_buf, size_t *dict_size);
+
+
+/* Get size of dictionary at given file path */
+sqfs_err d_size(const char *dict_filename, size_t *dict_size);
 
 #endif

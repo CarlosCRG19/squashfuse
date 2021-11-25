@@ -27,6 +27,7 @@
 #include "fs.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #ifdef _WIN32
 	#include <win32.h>
@@ -67,14 +68,14 @@
 
 /* TODO: WIN32 implementation of open/close */
 /* TODO: i18n of error messages */
-sqfs_err sqfs_open_image(sqfs *fs, const char *image, size_t offset) {
+sqfs_err sqfs_open_image(sqfs *fs, const char *image, size_t offset, void *zstd_dict_buf, size_t zstd_dict_size) {
 	sqfs_err err;
 	sqfs_fd_t fd;
 
 	if ((err = sqfs_fd_open(image, &fd, stderr)))
 		return err;
 
-	err = sqfs_init(fs, fd, offset);
+	err = sqfs_init(fs, fd, offset, zstd_dict_buf, zstd_dict_size);
 	switch (err) {
 		case SQFS_OK:
 			break;
@@ -121,5 +122,42 @@ sqfs_err sqfs_open_image(sqfs *fs, const char *image, size_t offset) {
 	if (err)
 		sqfs_fd_close(fd);
 	return err;
+}
+
+ 
+//-- Util functions for dictionary compression --//
+
+/* load_dict()
+	Load dictionary to passed buffer */ 
+sqfs_err load_dict(const char *dict_filename, void **zstd_dict_buf, size_t *zstd_dict_size)
+{
+		if (d_size(dict_filename, zstd_dict_size) == SQFS_ERR) {
+			fprintf(stderr, "Cannot stat source dictionary `%s`", dict_filename);
+			return SQFS_ERR; 
+		}
+
+		*zstd_dict_buf = malloc(*zstd_dict_size);
+
+		FILE* dict_file = fopen(dict_filename, "rb");
+		size_t read_size = fread(*zstd_dict_buf, 1, *zstd_dict_size, dict_file);
+		if (read_size != *zstd_dict_size) {
+			fprintf(stderr, "fread failed on given dictionary `%s`\n", dict_filename);
+			return SQFS_ERR;
+		}
+		fclose(dict_file);
+
+		return SQFS_OK;
+}
+
+/* d_size():
+	Get size of dictionary at given file path */
+sqfs_err d_size(const char *dict_filename, size_t *dict_size) 
+{
+	struct stat st_dict;
+	if(stat(dict_filename, &st_dict) == -1) {
+		return SQFS_ERR;
+	}
+	*dict_size = st_dict.st_size;
+	return SQFS_OK;
 }
 

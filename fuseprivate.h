@@ -48,6 +48,7 @@ typedef struct {
 	const char *image;
 	int mountpoint;
 	size_t offset;
+	char *zstd_dict;
 	unsigned int idle_timeout_secs;
 } sqfs_opts;
 int sqfs_opt_proc(void *data, const char *arg, int key,

@@ -33,9 +33,14 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include <stdio.h> // PLAYGROUND
 
 #define DATA_CACHED_BLKS 1
 #define FRAG_CACHED_BLKS 3
+
+
+void *zstd_dict_buf;
+size_t zstd_dict_size = 0;
 
 void sqfs_version_supported(int *min_major, int *min_minor, int *max_major,
 		int *max_minor) {
@@ -53,10 +58,10 @@ sqfs_compression_type sqfs_compression(sqfs *fs) {
 	return fs->sb.compression;
 }
 
-sqfs_err sqfs_init(sqfs *fs, sqfs_fd_t fd, size_t offset) {
+sqfs_err sqfs_init(sqfs *fs, sqfs_fd_t fd, size_t offset, void *dict_buf, size_t dict_size) {
 	sqfs_err err = SQFS_OK;
 	memset(fs, 0, sizeof(*fs));
-	
+
 	fs->fd = fd;
 	fs->offset = offset;
 	if (sqfs_pread(fd, &fs->sb, sizeof(fs->sb), fs->offset) != sizeof(fs->sb))
@@ -72,7 +77,13 @@ sqfs_err sqfs_init(sqfs *fs, sqfs_fd_t fd, size_t offset) {
 	if (fs->sb.s_major != SQUASHFS_MAJOR || fs->sb.s_minor > SQUASHFS_MINOR)
 		return SQFS_BADVERSION;
 	
-	if (!(fs->decompressor = sqfs_decompressor_get(fs->sb.compression)))
+	if (dict_size > 0 && dict_buf != NULL) {
+		if (!(fs->decompressor = sqfs_decompressor_get(ZSTD_COMPRESSION_DICT)))
+			return SQFS_BADCOMP;
+		
+		zstd_dict_buf = dict_buf;
+		zstd_dict_size = dict_size;
+	} else if (!(fs->decompressor = sqfs_decompressor_get(fs->sb.compression)))
 		return SQFS_BADCOMP;
 	
 	err = sqfs_table_init(&fs->id_table, fd, fs->sb.id_table_start + fs->offset,
@@ -135,7 +146,7 @@ sqfs_err sqfs_block_read(sqfs *fs, sqfs_off_t pos, bool compressed,
 		if (!decomp)
 			goto error;
 		
-		err = fs->decompressor((*block)->data, size, decomp, &outsize);
+		err = fs->decompressor((*block)->data, size, decomp, &outsize, zstd_dict_buf, zstd_dict_size);
 		if (err) {
 			free(decomp);
 			goto error;
@@ -164,8 +175,9 @@ sqfs_err sqfs_md_block_read(sqfs *fs, sqfs_off_t pos, size_t *data_size,
 	
 	*data_size = 0;
 	
-	if (sqfs_pread(fs->fd, &hdr, sizeof(hdr), pos + fs->offset) != sizeof(hdr))
+	if (sqfs_pread(fs->fd, &hdr, sizeof(hdr), pos + fs->offset) != sizeof(hdr)){
 		return SQFS_ERR;
+	}
 	pos += sizeof(hdr);
 	*data_size += sizeof(hdr);
 	sqfs_swapin16(&hdr);
@@ -174,6 +186,7 @@ sqfs_err sqfs_md_block_read(sqfs *fs, sqfs_off_t pos, size_t *data_size,
 	
 	err = sqfs_block_read(fs, pos, compressed, size,
 		SQUASHFS_METADATA_SIZE, block);
+
 	*data_size += size;
 	return err;
 }

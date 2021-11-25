@@ -37,7 +37,7 @@
 #include <zlib.h>
 
 static sqfs_err sqfs_decompressor_zlib(void *in, size_t insz,
-		void *out, size_t *outsz) {
+		void *out, size_t *outsz, void **zstd_dict_buf, size_t zstd_dict_size) {
 	uLongf zout = *outsz;
 	int zerr = uncompress((Bytef*)out, &zout, in, insz);
 	if (zerr != Z_OK)
@@ -53,7 +53,7 @@ static sqfs_err sqfs_decompressor_zlib(void *in, size_t insz,
 #include <lzma.h>
 
 static sqfs_err sqfs_decompressor_xz(void *in, size_t insz,
-		void *out, size_t *outsz) {
+		void *out, size_t *outsz, void **zstd_dict_buf, size_t zstd_dict_size) {
 	/* FIXME: Save stream state, to minimize setup time? */
 	uint64_t memlimit = UINT64_MAX;
 	size_t inpos = 0, outpos = 0;
@@ -72,7 +72,7 @@ static sqfs_err sqfs_decompressor_xz(void *in, size_t insz,
 #include <lzo/lzo1x.h>
 
 static sqfs_err sqfs_decompressor_lzo(void *in, size_t insz,
-		void *out, size_t *outsz) {
+		void *out, size_t *outsz, void **zstd_dict_buf, size_t zstd_dict_size) {
 	lzo_uint lzout = *outsz;
 	int err = lzo1x_decompress_safe(in, insz, out, &lzout, NULL);
 	if (err != LZO_E_OK)
@@ -87,7 +87,7 @@ static sqfs_err sqfs_decompressor_lzo(void *in, size_t insz,
 #ifdef HAVE_LZ4_H
 #include <lz4.h>
 static sqfs_err sqfs_decompressor_lz4(void *in, size_t insz,
-		void *out, size_t *outsz) {
+		void *out, size_t *outsz, void **zstd_dict_buf, size_t zstd_dict_size) {
 	int lz4out = LZ4_decompress_safe (in, out, insz, *outsz);
 	if (lz4out < 0)
 		return SQFS_ERR;
@@ -100,9 +100,28 @@ static sqfs_err sqfs_decompressor_lz4(void *in, size_t insz,
 
 #ifdef HAVE_ZSTD_H
 #include <zstd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
 static sqfs_err sqfs_decompressor_zstd(void *in, size_t insz,
-        void *out, size_t *outsz) {
+        void *out, size_t *outsz, void **zstd_dict_buf, size_t zstd_dict_size) {
 	const size_t zstdout = ZSTD_decompress(out, *outsz, in, insz);
+	if (ZSTD_isError(zstdout))
+		return SQFS_ERR;
+	*outsz = zstdout;
+	return SQFS_OK;
+}
+
+static sqfs_err sqfs_decompressor_zstd_dict(void *in, size_t insz,
+        void *out, size_t *outsz, void **zstd_dict_buf, size_t zstd_dict_size) {
+		
+	// Create DDict
+    ZSTD_DDict* const ddict = ZSTD_createDDict(zstd_dict_buf, zstd_dict_size);
+
+	// Decompression 
+	ZSTD_DCtx *dctx = ZSTD_createDCtx();
+	const size_t zstdout = ZSTD_decompress_usingDDict(dctx, out, *outsz, in, insz, ddict);
+
 	if (ZSTD_isError(zstdout))
 		return SQFS_ERR;
 	*outsz = zstdout;
@@ -127,10 +146,12 @@ sqfs_decompressor sqfs_decompressor_get(sqfs_compression_type type) {
 #endif
 #ifdef CAN_DECOMPRESS_ZSTD
 		case ZSTD_COMPRESSION: return &sqfs_decompressor_zstd;
+		case ZSTD_COMPRESSION_DICT: return &sqfs_decompressor_zstd_dict;
 #endif
 		default: return NULL;
 	}
 }
+
 
 static char *const sqfs_compression_names[SQFS_COMP_MAX] = {
 	NULL, "zlib", "lzma", "lzo", "xz", "lz4", "zstd",

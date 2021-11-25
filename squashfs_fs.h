@@ -121,12 +121,13 @@
 /*
  * definitions for structures on disk
  */
-#define ZLIB_COMPRESSION	1
-#define LZMA_COMPRESSION	2
-#define LZO_COMPRESSION		3
-#define XZ_COMPRESSION		4
-#define LZ4_COMPRESSION		5
-#define ZSTD_COMPRESSION	6
+#define ZLIB_COMPRESSION    	1
+#define LZMA_COMPRESSION    	2
+#define LZO_COMPRESSION	    	3
+#define XZ_COMPRESSION	    	4
+#define LZ4_COMPRESSION	    	5
+#define ZSTD_COMPRESSION	    6
+#define ZSTD_COMPRESSION_DICT	7
 
 struct squashfs_super_block {
 	__le32			s_magic;
