@@ -55,6 +55,7 @@ typedef uint32_t sqfs_inode_num;
 
 typedef struct sqfs sqfs;
 typedef struct sqfs_inode sqfs_inode;
+typedef struct sqfs_zstd_comp_opts sqfs_zstd_comp_opts;
 
 typedef struct {
 	size_t size;

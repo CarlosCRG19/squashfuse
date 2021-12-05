@@ -38,7 +38,7 @@ sqfs_err sqfs_fd_open(const char *path, sqfs_fd_t *fd, bool print);
 void sqfs_fd_close(sqfs_fd_t fd);
 
 /* Open a filesystem and print errors to stderr. */
-sqfs_err sqfs_open_image(sqfs *fs, const char *image, size_t offset, void *zstd_dict_buf, size_t zstd_dict_size);
+sqfs_err sqfs_open_image(sqfs *fs, const char *image, size_t offset);
 
 /*	Load dictionary to passed buffer */ 
 sqfs_err load_dict(const char *dict_filename, void **dict_buf, size_t *dict_size);

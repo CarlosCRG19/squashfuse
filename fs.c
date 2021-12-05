@@ -39,7 +39,7 @@
 #define FRAG_CACHED_BLKS 3
 
 
-void *zstd_dict_buf;
+void *zstd_dict_buf = NULL;
 size_t zstd_dict_size = 0;
 
 void sqfs_version_supported(int *min_major, int *min_minor, int *max_major,
@@ -58,7 +58,7 @@ sqfs_compression_type sqfs_compression(sqfs *fs) {
 	return fs->sb.compression;
 }
 
-sqfs_err sqfs_init(sqfs *fs, sqfs_fd_t fd, size_t offset, void *dict_buf, size_t dict_size) {
+sqfs_err sqfs_init(sqfs *fs, sqfs_fd_t fd, size_t offset) {
 	sqfs_err err = SQFS_OK;
 	memset(fs, 0, sizeof(*fs));
 
@@ -77,12 +77,23 @@ sqfs_err sqfs_init(sqfs *fs, sqfs_fd_t fd, size_t offset, void *dict_buf, size_t
 	if (fs->sb.s_major != SQUASHFS_MAJOR || fs->sb.s_minor > SQUASHFS_MINOR)
 		return SQFS_BADVERSION;
 	
-	if (dict_size > 0 && dict_buf != NULL) {
+	// Receive compression options from the filesystem
+	// if using zstd 
+	if (fs->sb.compression == ZSTD_COMPRESSION_DICT) {
+		sqfs_zstd_comp_opts *zstd_opts = malloc(sizeof(sqfs_zstd_comp_opts));
+		if (sqfs_pread(fd, zstd_opts, sizeof(sqfs_zstd_comp_opts), fs->offset + sizeof(fs->sb) + sizeof(unsigned short)) != sizeof(sqfs_zstd_comp_opts))
+			return SQFS_BADFORMAT;
+
+		zstd_dict_size = zstd_opts->dictionary_size;
+		zstd_dict_buf = malloc(zstd_dict_size);
+		if (sqfs_pread(fd, zstd_dict_buf, zstd_dict_size, fs->offset + sizeof(fs->sb) + sizeof(unsigned short) + sizeof(sqfs_zstd_comp_opts)) != zstd_dict_size)
+			return SQFS_BADFORMAT;
+	}
+
+	if (zstd_dict_size > 0 && zstd_dict_buf != NULL) {
 		if (!(fs->decompressor = sqfs_decompressor_get(ZSTD_COMPRESSION_DICT)))
 			return SQFS_BADCOMP;
-		
-		zstd_dict_buf = dict_buf;
-		zstd_dict_size = dict_size;
+	
 	} else if (!(fs->decompressor = sqfs_decompressor_get(fs->sb.compression)))
 		return SQFS_BADCOMP;
 	

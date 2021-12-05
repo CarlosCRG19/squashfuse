@@ -522,7 +522,7 @@ void teardown_idle_timeout() {
 	fuse_instance = NULL;
 }
 
-sqfs_ll *sqfs_ll_open(const char *path, size_t offset, void **zstd_dict_buf, size_t zstd_dict_size) {
+sqfs_ll *sqfs_ll_open(const char *path, size_t offset) {
 	sqfs_ll *ll;
 	
 	ll = malloc(sizeof(*ll));
@@ -531,7 +531,7 @@ sqfs_ll *sqfs_ll_open(const char *path, size_t offset, void **zstd_dict_buf, siz
 	} else {
 		memset(ll, 0, sizeof(*ll));
 		ll->fs.offset = offset;
-		if (sqfs_open_image(&ll->fs, path, offset, zstd_dict_buf, zstd_dict_size) == SQFS_OK) {
+		if (sqfs_open_image(&ll->fs, path, offset) == SQFS_OK) {
 			if (sqfs_ll_init(ll))
 				fprintf(stderr, "Can't initialize this filesystem!\n");
 			else

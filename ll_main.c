@@ -125,16 +125,8 @@ int main(int argc, char *argv[]) {
 	    }
 	}
 
-	void *zstd_dict_buf;
-	size_t zstd_dict_size = 0;
-	if (opts.zstd_dict != NULL)
-		load_dict(opts.zstd_dict, &zstd_dict_buf, &zstd_dict_size);
 
-	/* OPEN FS */
-	if (zstd_dict_size > 0) 
-		err = !(ll = sqfs_ll_open(opts.image, opts.offset, zstd_dict_buf, zstd_dict_size));
-	else 
-		err = !(ll = sqfs_ll_open(opts.image, opts.offset, NULL, 0));
+	err = !(ll = sqfs_ll_open(opts.image, opts.offset));
 	
 	/* STARTUP FUSE */
 	if (!err) {
